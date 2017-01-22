@@ -3,64 +3,137 @@ using System.Collections.Generic;
 
 public class CardStack : MonoBehaviour {
 
+	readonly Vector3 CARDHEIGHT = new Vector3 (0f, 0f, -0.02f);
+
+	LinkedList<GameObject> cardList = new LinkedList<GameObject>();
+
 	public GameObject cardObject;
 
-	int _size;
-
 	bool _active = false;
-	bool _hover = false;
+	bool _stagger = false;
+	bool _numbered = false;
 
-	public bool active{ get{ return _active; } set{_active = value; if (size>0) LastCard ().active = value;} }
-	public bool hover{ get{ return _hover; } set{_hover = value; if (size>0) LastCard ().hover = value;} }
-
-	public int size { get { return _size; } }
-
-	public void AddCard(Card.Cardcolor color, int number = 0)
-	{
-		if (number == 0) {
-			number = size + 1;
+	public bool active{ get{ return _active; } set{_active = value; if (number>0) LastCard ().active = value;} }
+	public bool stagger{ get{ return _stagger; } set{_stagger = value; if (number > 0) LastCard ().stagger = value;} }
+	public bool numbered {
+		get{ return _numbered; }
+		set {
+			_numbered = value;
+			if (number > 0) {
+				if (value) {
+					LastCard ().number = number;
+				} else {
+					LastCard ().number = 0;
+				}
+			}
 		}
-
-		if (size > 0) {
-			LastCard ().active = false;
-			LastCard ().hover = false;
-		}
-
-		GameObject newCardObject;
-		Card newCard;
-		newCardObject = Instantiate (cardObject, transform.position + new Vector3 (0.0f, 0.0f, -0.2f * size), Quaternion.identity,transform) as GameObject;
-		newCard = newCardObject.GetComponent<Card> ();
-		newCard.color = color;
-		newCard.number = number;
-		newCard.active = active;
-		newCard.hover = hover;
-		_size++;
 	}
-		
-	public void RemoveCard(int count=1)
-	{
-		for (int i = 0; i < count; i++) {
-			Destroy (LastCard().gameObject);
-			_size--;
-		}
-		active = active;
-		hover = hover;
-
+	public int number{ get { return cardList.Count; } }
+	public CardColor topCardColor { 
+		get { 
+			if (number > 0)
+				return LastCard ().color;
+			else
+				return CardColor.none; 
+		} 
 	}
+
+	public void Hover()
+	{
+		if (number > 0) {
+			LastCard ().hover = true;
+		}
+	}
+
+	public void SetProperties(bool activeVal, bool staggerVal, bool numberedVal)
+	{
+		active = activeVal;
+		stagger = staggerVal;
+		numbered = numberedVal;
+	}
+
+	public void ReceiveCard(GameObject receivedCard)
+	{
+		cardList.AddLast (receivedCard);
+		Card card = receivedCard.GetComponent<Card> ();
+		if (numbered) {
+			card.number = number;
+		} else {
+			card.number = 0;
+		}
+		card.position = transform.position + CARDHEIGHT * (number - 1);
+		card.stagger = stagger;
+		card.active = active;
+	}
+
+
+	public GameObject SendCard()
+	{
+		GameObject cardToSend = cardList.Last.Value;
+		cardList.RemoveLast ();
+		if (number > 0) {
+			Card card = cardList.Last.Value.GetComponent<Card> ();
+			if (numbered) {
+				card.number = number;
+			} else {
+				card.number = 0;
+			}
+			card.active = active;
+		}
+		return cardToSend;
+	}
+
+	public void Shuffle()
+	{
+		int n = number;
+		LinkedListNode<GameObject> node = cardList.First;
+		for (int i = 0; i <= n - 2; i++) {
+			int j = Random.Range (0, n-i);
+			LinkedListNode<GameObject> other = ElementAfter (node, j);
+			GameObject tempswap = node.Value;
+			node.Value = other.Value;
+			other.Value = tempswap;
+			node = node.Next;
+		}
+		node = cardList.First;
+		for (int i = 0; i < n; i++) {
+			node.Value.GetComponent<Card> ().position = transform.position + CARDHEIGHT *i;
+			if (numbered) {
+				node.Value.GetComponent<Card> ().number = i + 1;
+			}
+			node = node.Next;
+		}
+	}
+
+
+	// Private functions
+	LinkedListNode<GameObject> ElementAfter(LinkedListNode<GameObject> node,int index)
+	{
+		if (index == 0)
+			return node;
+		else
+			return ElementAfter (node.Next, index - 1);
+	
+	}
+
 	
 	Card LastCard()
 	{
-		return transform.GetChild (transform.childCount - 1).GetComponent<Card>();
+		return cardList.Last.Value.GetComponent<Card>();
 	}
 		
 
 
 	// Use this for initialization
-	void Start () {
-		AddCard (Card.Cardcolor.green);
-		AddCard (Card.Cardcolor.red);
-		RemoveCard ();
-	}
+//	void Start () {
+//		numbered = true;
+//		stagger = true;
+//		GameObject foo = Instantiate (cardObject) as GameObject;
+//		ReceiveCard (foo);
+//		foo = Instantiate (cardObject) as GameObject;
+//		ReceiveCard (foo);
+//		shuffle ();
+//	}
 	
 	// Update is called once per frame
 	void Update () {

@@ -9,6 +9,14 @@ public class Number : MonoBehaviour {
 
 	public int number{ 
 		get{ return _number; }
-		set{ _number = value; GetComponent<SpriteRenderer> ().sprite = numberSprite [_number - 1];}
+		set{
+			_number = value;
+			if (value > 0) {
+				GetComponent<SpriteRenderer> ().sprite = numberSprite [_number - 1];
+				GetComponent<SpriteRenderer> ().enabled = true;
+			} else if (value == 0) {
+				GetComponent<SpriteRenderer> ().enabled = false;
+			}
+		}
 	}
 }
