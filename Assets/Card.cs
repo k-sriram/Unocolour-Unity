@@ -2,6 +2,8 @@
 using System.Collections;
 using System.Collections.Generic;
 
+
+
 [System.Serializable]
 public class Card : MonoBehaviour {
 
@@ -9,53 +11,84 @@ public class Card : MonoBehaviour {
 	const float MAXROT = 10f;
 	const float epsilon = 0.1f;
 
-	public enum Cardcolor{red, green, yellow, blue, wild};
+	class HoverState:Object
+	{
+		enum State {normal,hover,posthover};
+		State state;
+
+		static Dictionary<State,State> UpdateTransition = new Dictionary<State,State>()
+		{{State.hover,State.posthover}, {State.posthover,State.normal}, {State.normal,State.normal}};
+
+		static Dictionary<State,bool> QueryFunction = new Dictionary<State,bool>()
+		{{State.hover,true}, {State.posthover,true}, {State.normal,false}};
+
+		public HoverState(){
+			state = State.normal;
+		}
+
+		public void Set (bool command)
+		{
+			if (command) {
+				state = State.hover;
+			} else {
+				state = State.normal;
+			}
+		}
+		public void Update ()
+		{
+			state = UpdateTransition [state];
+		}
+		public bool Query()
+		{
+			return QueryFunction [state];
+		}
+	}
 
 	public List<Sprite> card_sprite;
 	public List<Sprite> card_hover_sprite;
 	public List<Sprite> card_inactive_sprite;
 
-	Cardcolor _color;
-	bool _active;
-	bool _hover;
+	HoverState _hover = new HoverState();
 	bool _stagger;
-	bool stagger_uninitialized = true;
 	Vector3 _position;
 	Vector3 stagger_delta;
 	Quaternion stagger_rot;
 
 	public float speed;
-	public Cardcolor color{ get{ return _color;} set {_color = value; UpdateSprite ();} }
-	public bool active{ get { return _active; } set { _active = value; UpdateSprite ();} }
-	public bool hover{ get { return _hover; } set { _hover = value; UpdateSprite ();} }
+	public CardColor color;
+	public bool active;
+	public bool hover{ get { return _hover.Query(); } set { _hover.Set(value);} }
 	public int number {
 		get { return GetComponentInChildren<Number>().number; }
 		set { GetComponentInChildren<Number> ().number = value;}
 	}
 
-	public bool stagger { get { return _stagger; }
-		set { 
-			_stagger = value;
-			if (value && stagger_uninitialized) {
-				InitializeStagger ();
-			}
-		}
-	}
+	public bool stagger { get { return _stagger; } set { _stagger = value; } }
 
 	public Vector3 position { get { return _position; } set { _position = value; } }
+
 
 	void InitializeStagger()
 	{
 		stagger_delta = Random.insideUnitCircle * MAXDELTA;
 		stagger_rot = Quaternion.AngleAxis ((Random.value - .5f) * MAXROT, Vector3.forward);
-		stagger_uninitialized = false;
 	}
-
+		
 	void Start () {
-		UpdateSprite ();
+		InitializeStagger ();
 	}
 
 	void Update()
+	{
+		_hover.Update ();
+
+		UpdateSprite ();
+		UpdatePosition ();
+
+
+	}
+
+	void UpdatePosition()
 	{
 		Vector3 target_position;
 		if (stagger) {
@@ -67,9 +100,8 @@ public class Card : MonoBehaviour {
 		}
 		transform.position = Vector3.MoveTowards (transform.position, target_position, speed * Time.deltaTime);
 	}
-
-
-	void UpdateSprite (){
+	void UpdateSprite ()
+	{
 		if (active){
 			if (hover){
 				GetComponent<SpriteRenderer>().sprite = card_hover_sprite[(int)color];
@@ -80,4 +112,6 @@ public class Card : MonoBehaviour {
 			GetComponent<SpriteRenderer>().sprite = card_inactive_sprite[(int)color];
 		}
 	}
+
+
 }
