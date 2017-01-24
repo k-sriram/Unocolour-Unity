@@ -92,7 +92,6 @@ public class BoardManager : MonoBehaviour {
 	}
 	State Deal ()
 	{
-		animating = true;
 		StartCoroutine(DistributeToActiveCells());
 		return State.dealAnim;
 	}
@@ -129,13 +128,7 @@ public class BoardManager : MonoBehaviour {
 	}
 	State Collect ()
 	{
-		for (int i = 0; i < round; i++) {
-			foreach (CellPos pos in lastCell.Range()){
-				if (cells [pos].number > 0) {
-					deck.ReceiveCard (cells [pos].SendCard ());
-				}
-			}
-		}
+		StartCoroutine (CollectFromCells ());
 		return State.collectAnim;
 	}
 	State CollectAnim ()
@@ -201,12 +194,28 @@ public class BoardManager : MonoBehaviour {
 
 	IEnumerator DistributeToActiveCells()
 	{
-		foreach (CellPos i in lastCell.Range()) {
+		animating = true;
+		foreach (CellPos i in lastCell.Range(true,false,true)) {
 				cells [i].ReceiveCard (deck.SendCard ());
 				yield return new WaitForSeconds (DISTRIBUTETIME);
 		}
 		animating = false;
 	}
+
+	IEnumerator CollectFromCells()
+	{
+		animating = true;
+		for (int i = 0; i < round; i++) {
+			foreach (CellPos pos in lastCell.Range(true,false,false)){
+				if (cells [pos].number > 0) {
+					deck.ReceiveCard (cells [pos].SendCard ());
+					yield return new WaitForSeconds (DISTRIBUTETIME);
+				}
+			}
+		}
+		animating = false;
+	}
+
 
 	void SyncCardActives()
 	{
@@ -273,26 +282,7 @@ public class BoardManager : MonoBehaviour {
 
 			
 	}
-
-//		if (Time.realtimeSinceStartup > 2 && foo) {
-//			GetComponentInChildren<CardStack> ().shuffle ();
-//			StartCoroutine(DistributeToActiveCells (true));
-//			foo = false;
-//			Debug.Log ("shuffle");
-//		}
-//
-//		CellPos NewHoverCell = GetMouseCell ();
-//		if (NewHoverCell != null) {
-//			cells[NewHoverCell].Hover();
-//		}
-//
-//		if (Input.GetMouseButtonDown (0)) {
-//			if (NewHoverCell != null) {
-//				cells[NewHoverCell].ReceiveCard (deck.SendCard ());
-//				AddCardtoMove (NewHoverCell);
-//			}
-//		}
-//
+		
 }
 
 
