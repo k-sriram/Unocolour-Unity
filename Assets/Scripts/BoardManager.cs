@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using System.Collections;
@@ -10,8 +11,8 @@ public class BoardManager : MonoBehaviour {
 	public List<CardColor> deckColors;
 	public List<int> deckColorNumbers;
 	public GameObject cameraObject;
-	public Text scoreText;
-	new Camera camera;
+    public GameObject scoresheet;
+	Camera camera;
 
 	readonly static float DISTRIBUTETIME = 0.05f;
 	readonly static int columns = 10;
@@ -32,8 +33,133 @@ public class BoardManager : MonoBehaviour {
 	bool stateTransition;
 	int round;
 	int cardsplayed;
-	enum State {roundstart,shuffle,deal,play,collect,scoreboard,finalscoreboard};
-	State state;
+	enum State {start,roundstart,shuffle,shuffleAnim,deal,dealAnim,playStart,play,collect,collectAnim,scoreboard,finalscoreboard};
+	CellPos mousePos;
+
+	public class StateMachine <StateType>
+	{
+		public Dictionary <StateType,Func<StateType>> ProcessMap;
+		StateType state;
+
+		public StateMachine (StateType InitialState)
+		{
+			state = InitialState;
+		}
+
+		public void Process ()
+		{
+			state = ProcessMap [state] ();
+		}
+	}
+
+	StateMachine<State> state = new StateMachine<State> (State.start);
+
+	public BoardManager()
+	{
+		state.ProcessMap = new Dictionary<State, Func<State>> {	{ State.start,GameStart }, { State.roundstart,RoundStart }, 
+			{ State.shuffle,Shuffle }, { State.shuffleAnim,ShuffleAnim }, { State.deal,Deal },
+			{ State.dealAnim,DealAnim }, { State.playStart,PlayStart }, { State.play,Play }, { State.collect,Collect },
+			{ State.collectAnim, CollectAnim }, { State.scoreboard, Scoreboard }, { State.finalscoreboard, FinalScoreboard }
+		};
+	}
+
+
+	State GameStart ()
+	{
+		round = 0;
+		score = 0;
+		animating = false;
+		return State.roundstart;
+	}
+	State RoundStart ()
+	{
+		round++;
+		return State.shuffle;
+	}
+	State Shuffle ()
+	{
+		deck.Shuffle ();
+		return State.shuffleAnim;
+	}
+	State ShuffleAnim ()
+	{
+		if (animating)
+			return State.shuffleAnim;
+		if (round == 1)
+			return State.deal;
+		return State.playStart;
+	}
+	State Deal ()
+	{
+		StartCoroutine(DistributeToActiveCells());
+		return State.dealAnim;
+	}
+	State DealAnim ()
+	{
+		if (animating)
+			return State.dealAnim;
+		return State.playStart;
+	}
+	State PlayStart ()
+	{
+		cardsplayed = 0;
+		board.RecalculateActiveShapes (cellsAsCardColor);
+		SyncCardActives ();
+		if (deck.number < 4 || !board.IsAnyMovePossible ()) {
+			return State.collect;
+		}
+		return State.play;
+	}
+	State Play()
+	{
+		if (Input.GetMouseButtonDown (0) && mousePos != null) {
+			if (board.CellActive (mousePos)) {
+				cardsplayed += 1;
+				cells [mousePos].ReceiveCard (deck.SendCard ());
+				board.AddCellToMove (mousePos);
+				SyncCardActives ();
+			}
+			if (cardsplayed == 4) {
+				return State.playStart;
+			}
+		}
+		return State.play;
+	}
+	State Collect ()
+	{
+		StartCoroutine (CollectFromCells ());
+		return State.collectAnim;
+	}
+	State CollectAnim ()
+	{
+		if (animating)
+			return State.collectAnim;
+		return State.scoreboard;
+	}
+	State Scoreboard ()
+	{
+		foreach (CellPos pos in lastCell.Range()) {
+			score += round * Triangle (cells [pos].number);
+		}
+		
+        scoresheet.GetComponent<Scoresheet>().ShowScore(score, deck.number == 108);
+
+        return State.finalscoreboard;
+	}
+	State FinalScoreboard ()
+    {
+        if (scoresheet.activeSelf)
+        {
+            return State.finalscoreboard;
+        }
+        if (deck.number == 108)
+        {
+            SceneChanger.instance.LoadMainMenu();
+        }
+        return State.roundstart;
+    }
+		
+
 
 	BoardEngine board;
 
@@ -43,7 +169,7 @@ public class BoardManager : MonoBehaviour {
 		// Making the deck
 		GameObject deckStack = Instantiate(stackPrefab,new Vector3(0f,-3f,0f),Quaternion.identity, transform) as GameObject;
 		deck = deckStack.GetComponent<CardStack> ();
-		deck.SetProperties(true,false,false);
+        deck.SetProperties(true,false,true);
 
 		// Making the cards
 		for (int i = 0; i < deckColors.Count; i++) {
@@ -70,16 +196,31 @@ public class BoardManager : MonoBehaviour {
 		stack.ReceiveCard (cardObject);
 	}
 
-	IEnumerator DistributeToActiveCells(bool force=false)
+	IEnumerator DistributeToActiveCells()
 	{
-		foreach (CellPos i in lastCell.Range()) {
-			if (cells [i].number > 0 || force) {
+		animating = true;
+		foreach (CellPos i in lastCell.Range(true,false,true)) {
 				cells [i].ReceiveCard (deck.SendCard ());
 				yield return new WaitForSeconds (DISTRIBUTETIME);
+		}
+		animating = false;
+	}
+
+	IEnumerator CollectFromCells()
+	{
+		animating = true;
+		for (int i = 0; i < round; i++) {
+			foreach (CellPos pos in lastCell.Range(true,false,false)){
+                if (cells[pos].number > 0)
+                {
+                    deck.ReceiveCard(cells[pos].SendCard());
+                    yield return new WaitForSeconds(DISTRIBUTETIME);
+                }
 			}
 		}
 		animating = false;
 	}
+
 
 	void SyncCardActives()
 	{
@@ -102,46 +243,6 @@ public class BoardManager : MonoBehaviour {
 		return n * (n + 1) / 2;
 	}
 
-	void RecalculateMoves()
-	{
-		board.RecalculateActiveShapes (cellsAsCardColor);
-		SyncCardActives ();
-	}
-	void AddCardtoMove(CellPos pos)
-	{
-		if (board.CellActive (pos)) {
-			cardsplayed += 1;
-			cells [pos].ReceiveCard (deck.SendCard ());
-			board.AddCellToMove (pos);
-			SyncCardActives ();
-		}
-	}
-	void Shuffle()
-	{
-		deck.Shuffle ();
-	}
-	void Deal()
-	{
-		animating = true;
-		StartCoroutine(DistributeToActiveCells (round == 1));
-	}
-	void Collect()
-	{
-		for (int i = 0; i < round; i++) {
-			foreach (CellPos pos in lastCell.Range()){
-				if (cells [pos].number > 0) {
-					deck.ReceiveCard (cells [pos].SendCard ());
-				}
-			}
-		}
-	}
-	void Score()
-	{
-		foreach (CellPos pos in lastCell.Range()) {
-			score += round * Triangle (cells [pos].number);
-		}
-		scoreText.text = score.ToString ();
-	}
 
 	CellPos GetMouseCell()
 	{
@@ -168,121 +269,26 @@ public class BoardManager : MonoBehaviour {
 	{
 		camera = cameraObject.GetComponent<Camera> ();
 		InstantiateBoard ();
-		state = State.roundstart;
-		round = 0;
-		score = 0;
-		scoreText.text = score.ToString ();
-		animating = false;
-		stateTransition = false;
+        scoresheet.SetActive(false);
+
 
 	}
 		
 	void Update(){
 
-		CellPos mousePos = GetMouseCell ();
+		mousePos = GetMouseCell ();
 
 		if (mousePos != null && !animating) {
 			cells [mousePos].Hover ();
 		}
 
-		switch (state) {
-		case State.roundstart:
-			round += 1;
-			state = State.shuffle;
-			stateTransition = true;
-			break;
-		case State.shuffle:
-			if (stateTransition) {
-				stateTransition = false;
-				Shuffle ();
-			} 
-			if (!animating) {
-				if (round == 1) {
-					state = State.deal;
-				} else {
-					state = State.play;
-				}
-				stateTransition = true;
-			}
-			break;
-		case State.deal:
-			if (stateTransition) {
-				stateTransition = false;
-				Deal ();
-			} 
-			if (!animating) {
-				state = State.play;
-				stateTransition = true;
-			}
-			break;
-		case State.play:
-			if (stateTransition) {
-				stateTransition = false;
-				cardsplayed = 0;
-				RecalculateMoves ();
-				if (deck.number < 4 || !board.IsAnyMovePossible ()) {
-					state = State.collect;
-					stateTransition = true;
-				}
-			} 
-			if (!animating) {
-				if (Input.GetMouseButtonDown (0) && mousePos != null) {
-					AddCardtoMove (mousePos);
-					if (cardsplayed == 4) {
-						stateTransition = true;
-					}
-				}
-			}
-			break;
-		case State.collect:
-			if (stateTransition) {
-				stateTransition = false;
-				Collect ();
-			}
-			if (!animating) {
-				state = State.scoreboard;
-				stateTransition = true;
-			}
-			break;
-		case State.scoreboard:
-			if (stateTransition) {
-				stateTransition = false;
-				Score ();
-			}
-			if (!animating) {
-				if (deck.number == 108) {
-					state = State.finalscoreboard;
-				} else {
-					state = State.roundstart;
-				}
-				stateTransition = true;
-			}
-			break;
-		}
+		state.Process ();
+
 			
 
 			
 	}
-
-//		if (Time.realtimeSinceStartup > 2 && foo) {
-//			GetComponentInChildren<CardStack> ().shuffle ();
-//			StartCoroutine(DistributeToActiveCells (true));
-//			foo = false;
-//			Debug.Log ("shuffle");
-//		}
-//
-//		CellPos NewHoverCell = GetMouseCell ();
-//		if (NewHoverCell != null) {
-//			cells[NewHoverCell].Hover();
-//		}
-//
-//		if (Input.GetMouseButtonDown (0)) {
-//			if (NewHoverCell != null) {
-//				cells[NewHoverCell].ReceiveCard (deck.SendCard ());
-//				AddCardtoMove (NewHoverCell);
-//			}
-//		}
-//
+		
 }
 
 

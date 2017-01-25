@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 89ebe98b58fa0024e97a81457d7716a9
+timeCreated: 1485380714
+licenseType: Free
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences:
+  - cardPrefab: {fileID: 1000010085129196, guid: e0b9f86167138a8419c4b08ea2cea2b5,
+      type: 2}
+  - stackPrefab: {fileID: 1000011268937094, guid: 87be1ad0f2f070f47ad2e2ddc5676604,
+      type: 2}
+  - cameraObject: {instanceID: 0}
+  - scoresheet: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

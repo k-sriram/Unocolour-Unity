@@ -97,32 +97,42 @@ public class CellPos : IEquatable<CellPos> {
 		return string.Format ("({0},{1})",x,y);
 	}
 
-	public static CellRange Range(CellPos lastCell)
+	public static CellRange Range(CellPos lastCell, bool rowFirst = false, bool invertX = false, bool invertY = false)
 	{
-		return new CellRange (lastCell);
+		return new CellRange (lastCell, rowFirst, invertX, invertY);
 	}
 
-	public CellRange Range()
+	public CellRange Range(bool rowFirst = false, bool invertX = false, bool invertY = false)
 	{
-		return new CellRange (this);
+		return new CellRange (this, rowFirst, invertX, invertY);
 	}
 
 	public class CellRange : IEnumerable<CellPos>
 	{
-		CellPos LastCell;
-		public CellRange (CellPos LastCell)
+		int[,] limit;
+		int[] ord;
+		int[] dir;
+		readonly static int[] inc = new int[2] { 1, -1 };
+		readonly static int[][] comp = new int[2][ ] { new int [2] { 0, 1 }, new int [2] { 1, 0 } }; 
+
+		public CellRange (CellPos LastCell , bool rowFirst = false, bool invertX = false, bool invertY = false)
 		{
-			this.LastCell = LastCell;
+			limit = new int [2,2] { { 0, LastCell.x - 1}, { 0, LastCell.y - 1} };
+			ord = comp[rowFirst?1:0];
+			dir = new int[] {invertX?1:0 ,invertY?1:0};
 		}
 
 		public IEnumerator<CellPos> GetEnumerator()
 		{
-			for (int i = 0; i < LastCell.x; i++) {
-				for (int j = 0; j < LastCell.y; j++) {
-					yield return new CellPos (i, j);
+			int[] i = new int[2];
+			for (i[0] = limit[ord[0],dir[ord[0]]]; i[0] != limit[ord[0],1-dir[ord[0]]] + inc[dir[ord[0]]]; i[0] += inc[dir[ord[0]]]) {
+				for (i[1] = limit[ord[1],dir[ord[1]]]; i[1] != limit[ord[1],1-dir[ord[1]]] + inc[dir[ord[1]]]; i[1] += inc[dir[ord[1]]]) {
+					yield return new CellPos (i[ord[0]],i[ord[1]]);
 				}
 			}
 		}
+
+
 
 		IEnumerator IEnumerable.GetEnumerator()
 		{
