@@ -11,8 +11,8 @@ public class BoardManager : MonoBehaviour {
 	public List<CardColor> deckColors;
 	public List<int> deckColorNumbers;
 	public GameObject cameraObject;
-	public Text scoreText;
-	new Camera camera;
+    public GameObject scoresheet;
+	Camera camera;
 
 	readonly static float DISTRIBUTETIME = 0.05f;
 	readonly static int columns = 10;
@@ -68,7 +68,6 @@ public class BoardManager : MonoBehaviour {
 	{
 		round = 0;
 		score = 0;
-		scoreText.text = score.ToString ();
 		animating = false;
 		return State.roundstart;
 	}
@@ -142,18 +141,23 @@ public class BoardManager : MonoBehaviour {
 		foreach (CellPos pos in lastCell.Range()) {
 			score += round * Triangle (cells [pos].number);
 		}
-		scoreText.text = score.ToString ();
-		if (deck.number == 108) {
-			return State.finalscoreboard;
-		} else {
-			return State.roundstart;
-		}
+		
+        scoresheet.GetComponent<Scoresheet>().ShowScore(score, deck.number == 108);
+
+        return State.finalscoreboard;
 	}
 	State FinalScoreboard ()
-	{
-		scoreText.text = string.Format ("Final: {0}", score);
-		return State.finalscoreboard;
-	}
+    {
+        if (scoresheet.activeSelf)
+        {
+            return State.finalscoreboard;
+        }
+        if (deck.number == 108)
+        {
+            SceneChanger.instance.LoadMainMenu();
+        }
+        return State.roundstart;
+    }
 		
 
 
@@ -165,7 +169,7 @@ public class BoardManager : MonoBehaviour {
 		// Making the deck
 		GameObject deckStack = Instantiate(stackPrefab,new Vector3(0f,-3f,0f),Quaternion.identity, transform) as GameObject;
 		deck = deckStack.GetComponent<CardStack> ();
-		deck.SetProperties(true,false,false);
+        deck.SetProperties(true,false,true);
 
 		// Making the cards
 		for (int i = 0; i < deckColors.Count; i++) {
@@ -207,10 +211,11 @@ public class BoardManager : MonoBehaviour {
 		animating = true;
 		for (int i = 0; i < round; i++) {
 			foreach (CellPos pos in lastCell.Range(true,false,false)){
-				if (cells [pos].number > 0) {
-					deck.ReceiveCard (cells [pos].SendCard ());
-					yield return new WaitForSeconds (DISTRIBUTETIME);
-				}
+                if (cells[pos].number > 0)
+                {
+                    deck.ReceiveCard(cells[pos].SendCard());
+                    yield return new WaitForSeconds(DISTRIBUTETIME);
+                }
 			}
 		}
 		animating = false;
@@ -264,6 +269,7 @@ public class BoardManager : MonoBehaviour {
 	{
 		camera = cameraObject.GetComponent<Camera> ();
 		InstantiateBoard ();
+        scoresheet.SetActive(false);
 
 
 	}
