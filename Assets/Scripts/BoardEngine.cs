@@ -142,9 +142,6 @@ public class CellPos : IEquatable<CellPos> {
 }
 	
 
-
-
-
 public class Shape : List<CellPos>
 {
 	public Shape (IEnumerable<CellPos> collection) : base (collection) {}
@@ -185,18 +182,23 @@ public class Shape : List<CellPos>
 
 }
 
+
 public class BoardEngine 
 {
+    
+
 	static List<Shape> baseShapes;
 	List<Shape> possibleShapes;
 	CellPos lastCell;
 	Dictionary<Shape,bool> activeShapes;
 	Dictionary<CellPos,bool> activeCells;
-	List<CellPos> clickedCells;
+    List<CellPos> clickedCells;
 
-	public bool CellActive(CellPos pos)
+    public bool CellActive(CellPos pos, bool clickedCellsAreInactive = true)
 	{
-		return activeCells [pos];
+        if (clickedCellsAreInactive && clickedCells.Contains(pos))
+            return false;
+        return activeCells[pos];
 	}
 
 	static BoardEngine()
@@ -247,8 +249,8 @@ public class BoardEngine
 
 		activeShapes = new Dictionary<Shape,bool> (possibleShapes.Count);
 		activeCells = new Dictionary<CellPos,bool>(lastCell.area);
-		clickedCells = new List<CellPos> (baseShapes[0].Count);
-	}
+        clickedCells = new List<CellPos>(baseShapes[0].Count);
+    }
 
 
 
@@ -264,16 +266,13 @@ public class BoardEngine
 				}
 			}
 		}
-		foreach (CellPos clicked in clickedCells) {
-			activeCells [clicked] = false;
-		}
-	}
+    }
 		
 
 	public void RecalculateActiveShapes(Dictionary<CellPos,CardColor> topColors)
 	{
-		clickedCells.Clear ();
-		foreach (Shape testShape in possibleShapes) {
+        clickedCells.Clear();
+        foreach (Shape testShape in possibleShapes) {
 			activeShapes [testShape] = testShape.isValidMove (topColors);
 		}
 		UpdateActiveCells ();
@@ -281,8 +280,8 @@ public class BoardEngine
 
 	public void AddCellToMove (CellPos pos)
 	{
-		clickedCells.Add (pos);
-		foreach (Shape testShape in possibleShapes) {
+        clickedCells.Add(pos);
+        foreach (Shape testShape in possibleShapes) {
 			activeShapes [testShape] = activeShapes [testShape] && testShape.Contains (pos);
 		}
 		UpdateActiveCells ();
